@@ -12,6 +12,12 @@ namespace Offsets {
 	extern const float brushSize = 0.025;
 }
 
+namespace EditType {
+	extern const Ogre::String Ground = "ground";
+	extern const Ogre::String Tree = "tree";
+	extern const Ogre::String Dodad = "dodad";
+}
+
 namespace TerrainType {
 	extern const Ogre::String Grass = "grass";
 	extern const Ogre::String Rock = "rock";
@@ -21,7 +27,8 @@ namespace TerrainType {
 SimRunnable::SimRunnable()
 	: mTerrainGroup(0),
 	mTerrainGlobals(0),
-	mInfoLabel(0)
+	mInfoLabel(0),
+	mLastDodadId(0)
 {
 }
 //----------------------------------------------------------------
@@ -62,6 +69,23 @@ void getCellCenter(Ogre::Vector3 centerPosition, Ogre::Vector3* centerCellPositi
 }
 //----------------------------------------------------------------
 
+bool SimRunnable::keyPressed(const OgreBites::KeyboardEvent& evt)
+{	
+	Ogre::Vector3 camPosition = mScnMgr->getSceneNode("camAnchor")->getPosition();
+	if (evt.keysym.sym == SDLK_F1) {
+		Ogre::Vector3 newCamPos = Ogre::Vector3(0, 50, 0);
+		mScnMgr->getSceneNode("camAnchor")->translate(newCamPos, Ogre::Node::TS_LOCAL);
+	}
+
+	if (evt.keysym.sym == SDLK_F2) {
+		Ogre::Vector3 newCamPos = Ogre::Vector3(0, -50, 0);
+		mScnMgr->getSceneNode("camAnchor")->translate(newCamPos, Ogre::Node::TS_LOCAL);
+	}
+
+	return true;
+}
+//----------------------------------------------------------------
+
 void SimRunnable::buttonHit(OgreBites::Button* btn)
 {
 	if (btn->getName() == "Save") {
@@ -70,13 +94,25 @@ void SimRunnable::buttonHit(OgreBites::Button* btn)
 		serialize();
 	}
 	else if (btn->getName() == "Load") {
+
+		Ogre::Image combined;
+
+		combined.loadTwoImagesAsRGBA("tiaga_seamless_0.jpg", "tiaga_seamless_0_SPEC.bmp",
+			Ogre::ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME, Ogre::PF_BYTE_RGBA);
+		combined.save("tiaga_seamless_0_diffusespecular.png");
+
+		combined.loadTwoImagesAsRGBA("tiaga_seamless_0_NORM.tga", "tiaga_seamless_0_DISP.bmp",
+			Ogre::ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME, Ogre::PF_BYTE_RGBA);
+		combined.save("tiaga_seamless_0_normalheight.png");
+
 		/*Ogre::String filePath = "terrain_bogaloo.dat";
 		mTerrainGroup->removeAllTerrains();
 		mTerrainGroup->loadGroupDefinition(filePath);
 		mTerrainGroup->loadAllTerrains(true);*/
 		//mTerrainGroup->loadAllTerrains(true);
-
 	}
+
+	
 }
 //----------------------------------------------------------------
 
@@ -231,8 +267,18 @@ void SimRunnable::alterTerrain(Ogre::Terrain* terrain, Ogre::Vector3 centerPosit
 	blendMap0->update();
 	blendMap1->dirty();
 	blendMap1->update();
+	mTerrainGroup->update();
 }
 //----------------------------------------------------------------
+
+void SimRunnable::alterDodad(Ogre::Terrain* terrain, Ogre::Vector3 centerPosition, Ogre::Vector2 gridCoordinates) {
+	Ogre::Vector3 centerCellPos;
+	getCellCenter(centerPosition, &centerCellPos);
+
+	createDodadSG(centerCellPos, mLastDodadId++);
+}
+//----------------------------------------------------------------
+
 
 bool SimRunnable::mouseReleased(const OgreBites::MouseButtonEvent& evt)
 {
@@ -251,8 +297,15 @@ bool SimRunnable::mouseReleased(const OgreBites::MouseButtonEvent& evt)
 		for (Ogre::TerrainGroup::TerrainList::iterator ti = terrainList.begin(); ti != terrainList.end(); ++ti)
 		{
 			Ogre::Vector2 gridCoordinates = updateCoords(rayResult.position);
-			alterTerrain(*ti, rayResult.position, gridCoordinates);
-			mTerrainGroup->update();
+
+			if (mSelectAlterationSM->getSelectedItem() == EditType::Ground) {	
+				alterTerrain(*ti, rayResult.position, gridCoordinates);
+			}
+			else if (mSelectAlterationSM->getSelectedItem() == EditType::Dodad) {
+				alterDodad(*ti, rayResult.position, gridCoordinates);
+			}
+			
+			
 		}
 		/*Ogre::AxisAlignedBox box()
 		mTerrainGroup->boxIntersects*/
@@ -260,6 +313,7 @@ bool SimRunnable::mouseReleased(const OgreBites::MouseButtonEvent& evt)
 
 	return 0;
 }
+
 
 
 void SimRunnable::setup(void) {
@@ -283,6 +337,7 @@ void SimRunnable::setup(void) {
 	mElevationSlider = mTrayMgr->createThickSlider(OgreBites::TL_TOPRIGHT, "Elevation", "Elevation:", 180.0f, 80.0f, -1, 1, 3);
 	mElevationSlider->setValue(0);
 	mBrushSizeSlider = mTrayMgr->createThickSlider(OgreBites::TL_TOPRIGHT, "BrushSize", "Brush Size:", 180.0f, 80.0f, 1, 4, 4);
+	mSelectAlterationSM = mTrayMgr->createThickSelectMenu(OgreBites::TL_TOPRIGHT, "EditType", "Edit Types:", 180.0f, 3, { EditType::Ground, EditType::Tree, EditType::Dodad });
 	mEditTextureSM = mTrayMgr->createThickSelectMenu(OgreBites::TL_TOPRIGHT, "EditColor", "Colors:", 180.0f, 3, { TerrainType::Grass, TerrainType::Rock, TerrainType::Sand });
 
 	mCoordsBox = mTrayMgr->createTextBox(OgreBites::TL_BOTTOMRIGHT, "CoordsBox", "Coordinates", 200.0f, 125.0f);
@@ -308,9 +363,15 @@ void SimRunnable::setup(void) {
 
 	root->addFrameListener(this);
 
-	mScnMgr->setAmbientLight(Ogre::ColourValue(1.0f, 1.0f, 1.0f));
+	mScnMgr->setAmbientLight(Ogre::ColourValue(0.75f, 0.75f, 0.75f));
 	//mScnMgr->setShadowTechnique(Ogre::ShadowTechnique::SHADOWTYPE_STENCIL_MODULATIVE);
-	Ogre::Light * spotLight = mScnMgr->createLight("SpotLight");
+	Ogre::Light* spotLight = mScnMgr->createLight("SpotLight");
+	spotLight->setType(Ogre::Light::LT_DIRECTIONAL);
+	spotLight->setDirection(Ogre::Vector3(1.0f, -1.0f, -1.0f).normalisedCopy());
+	spotLight->setDiffuseColour(1.0f, 1.0f, 1.0f);
+	spotLight->setSpecularColour(0.25f, 0.25f, 0.25f);
+
+	/*Ogre::Light * spotLight = mScnMgr->createLight("SpotLight");
 	spotLight->setDiffuseColour(0, 0, 1.0);
 	spotLight->setSpecularColour(0, 0, 1.0);
 	spotLight->setType(Ogre::Light::LT_SPOTLIGHT);
@@ -318,7 +379,7 @@ void SimRunnable::setup(void) {
 	spotLightNode->attachObject(spotLight);
 	spotLightNode->setDirection(-1, -1, 0);
 	spotLightNode->setPosition(Ogre::Vector3(200, 200, 0));
-	spotLight->setSpotlightRange(Ogre::Degree(35), Ogre::Degree(50));
+	spotLight->setSpotlightRange(Ogre::Degree(35), Ogre::Degree(50));*/
 	
 	/** Terrain loading **/
 	mTerrainGlobals = new Ogre::TerrainGlobalOptions();
@@ -328,7 +389,7 @@ void SimRunnable::setup(void) {
 		mScnMgr,
 		Ogre::Terrain::ALIGN_X_Z,
 		513, Offsets::worldSize);
-	mTerrainGroup->setFilenameConvention(Ogre::String("terrain"), Ogre::String("dat"));
+	mTerrainGroup->setFilenameConvention(Ogre::String("terrainNewEdit"), Ogre::String("dat"));
 	mTerrainGroup->setOrigin(Ogre::Vector3::ZERO);
 	mTerrainGroup->setOrigin(Ogre::Vector3(1000, 0, 1000));
 
@@ -370,8 +431,64 @@ void SimRunnable::setup(void) {
 			worldSpaceCells.push_back(cell);
 		}
 	}
+
+	Ogre::Entity* treeEnt = mScnMgr->createEntity("BirchTree.001.mesh");
+	Ogre::SceneNode* treeNode = mScnMgr->getRootSceneNode()->createChildSceneNode("BirchTree", Ogre::Vector3(500, 200, 500));
+	treeNode->setScale(40, 40, 40);
+	treeNode->attachObject(treeEnt);
+	treeEnt->setCastShadows(true);
+
+	initializeDodads();
+
+	/*Ogre::Entity* grass = mScnMgr->createEntity("GrassBladesMesh");
+	Ogre::StaticGeometry* sg = mScnMgr->createStaticGeometry("GrassArea");
+
+	const int size = Offsets::cellSize;
+	const int amount = 1;
+
+	sg->setRegionDimensions(Ogre::Vector3(size, size, size));
+	sg->setOrigin(Ogre::Vector3(500, 200, 500));
+
+	Ogre::Vector3 dodadPosition = Ogre::Vector3::ZERO;
+	Ogre::Vector3 scale(1, Ogre::Math::RangeRandom(0.9, 1.1), 1);
+	Ogre::Quaternion orientation;
+	orientation.FromAngleAxis(
+		Ogre::Degree(Ogre::Math::RangeRandom(0, 359)),
+		Ogre::Vector3::UNIT_Y);
+
+	sg->addEntity(grass, dodadPosition, orientation, scale);*/
+
+	/*const int size = 375;
+	const int amount = 1;
+
+	sg->setRegionDimensions(Ogre::Vector3(size, size, size));
+	sg->setOrigin(Ogre::Vector3(-size / 2, 0, -size / 2));
+
+	for (int x = -size / 2; x < size / 2; x += (size / amount))
+	{
+		for (int z = -size / 2; z < size / 2; z += (size / amount))
+		{
+			Ogre::Real r = size / (float)amount / 2;
+			Ogre::Vector3 pos(
+				x + Ogre::Math::RangeRandom(-r, r),
+				0,
+				z + Ogre::Math::RangeRandom(-r, r));
+
+			Ogre::Vector3 scale(1, Ogre::Math::RangeRandom(0.9, 1.1), 1);
+
+			Ogre::Quaternion orientation;
+			orientation.FromAngleAxis(
+				Ogre::Degree(Ogre::Math::RangeRandom(0, 359)),
+				Ogre::Vector3::UNIT_Y);
+
+			sg->addEntity(grass, pos, orientation, scale);
+		}
+	}*/
+
+	//sg->build();
 }
 //----------------------------------------------------------------
+
 
 
 void SimRunnable::frameRendered(const Ogre::FrameEvent& evt)
@@ -424,6 +541,81 @@ void SimRunnable::frameRendered(const Ogre::FrameEvent& evt)
 			mTerrainsImported = false;
 		}
 	}
+}
+//----------------------------------------------------------------
+
+void SimRunnable::initializeDodads()
+{
+	const float width = 40;
+	const float height = 250;
+	Ogre::Vector3 vec(width / 2, 0, 0);
+	Ogre::ManualObject obj("GrassObject");
+
+	Ogre::Quaternion quat;
+	quat.FromAngleAxis(Ogre::Degree(60), Ogre::Vector3::UNIT_Y);
+
+	obj.begin("Examples/GrassBlades5", Ogre::RenderOperation::OT_TRIANGLE_LIST);
+
+	obj.position(-vec.x, height, -vec.z);
+	obj.textureCoord(0, 0);
+	obj.position(vec.x, height, vec.z);
+	obj.textureCoord(1, 0);
+	obj.position(-vec.x, 200, -vec.z);
+	obj.textureCoord(0, 1);
+	obj.position(vec.x, 200, vec.z);
+	obj.textureCoord(1, 1);
+
+	obj.triangle(0, 3, 1);
+	obj.triangle(0, 2, 3);
+
+	vec = quat * vec;
+
+	/*for (int i = 0; i < 3; ++i)
+	{
+		obj.position(-vec.x, height, -vec.z);
+		obj.textureCoord(0, 0);
+		obj.position(vec.x, height, vec.z);
+		obj.textureCoord(1, 0);
+		obj.position(-vec.x, 200, -vec.z);
+		obj.textureCoord(0, 1);
+		obj.position(vec.x, 200, vec.z);
+		obj.textureCoord(1, 1);
+
+		int offset = 4 * i;
+		obj.triangle(offset, offset + 3, offset + 1);
+		obj.triangle(offset, offset + 2, offset + 3);
+
+		vec = quat * vec;
+	}*/
+
+	obj.end();
+	obj.convertToMesh("GrassBladesMesh");
+}
+//----------------------------------------------------------------
+
+void SimRunnable::createDodadSG(Ogre::Vector3 position, int id) {
+	Ogre::Entity* grass = mScnMgr->createEntity("GrassBladesMesh");
+	Ogre::String sgName = "GrassArea_" + Ogre::StringConverter::toString(id);
+	Ogre::StaticGeometry* sg = mScnMgr->createStaticGeometry(sgName);
+
+	const int size = Offsets::cellSize;
+	const int amount = 1;
+
+	sg->setRegionDimensions(Ogre::Vector3(10, 10, 10));
+	sg->setOrigin(position);
+
+	Ogre::Vector3 dodadPosition = position;
+	Ogre::Vector3 scale(1, Ogre::Math::RangeRandom(0.9, 1.1), 1);
+	Ogre::Quaternion orientation;
+	/*orientation.FromAngleAxis(
+		Ogre::Degree(Ogre::Math::RangeRandom(0, 359)),
+		Ogre::Vector3::UNIT_Y);*/
+	orientation.FromAngleAxis(
+		Ogre::Degree(45),
+		Ogre::Vector3::UNIT_Y);
+
+	sg->addEntity(grass, dodadPosition, orientation, scale);
+	sg->build();
 }
 //----------------------------------------------------------------
 
@@ -482,7 +674,7 @@ void SimRunnable::initBlendMaps(Ogre::Terrain* terrain)
 			Ogre::Real tx, ty;
 
 			blendMap0->convertImageToTerrainSpace(x, y, &tx, &ty);
-			*pBlend0++ = 0.1f;
+			*pBlend0++ = 0.3f;
 			*pBlend1++ = 0.1f;
 		}
 	}
@@ -512,17 +704,31 @@ void SimRunnable::configureTerrainDefaults(Ogre::Light* light)
 	importData.maxBatchSize = 65;
 
 	importData.layerList.resize(3);
-	importData.layerList[0].worldSize = 500;
-	importData.layerList[0].textureNames.push_back(
+	importData.layerList[0].worldSize = 300;
+	/*importData.layerList[0].textureNames.push_back(
 		"grass_green-01_diffusespecular.dds");
 	importData.layerList[0].textureNames.push_back(
-		"grass_green-01_normalheight.dds");
-	importData.layerList[1].worldSize = 1000;
-	importData.layerList[1].textureNames.push_back(
+		"grass_green-01_normalheight.dds");*/
+
+	/*importData.layerList[0].textureNames.push_back("grass_0_diffusespecular.dds");
+	importData.layerList[0].textureNames.push_back("grass_0_normalheight.dds");*/
+
+	importData.layerList[0].textureNames.push_back("grass_seamless_diffusespecular.png");
+	importData.layerList[0].textureNames.push_back("grass_seamless_diffusespecular.png");
+
+	importData.layerList[1].worldSize = 200;
+	/*importData.layerList[1].textureNames.push_back(
 		"dirt_grayrocky_diffusespecular.dds");
 	importData.layerList[1].textureNames.push_back(
-		"dirt_grayrocky_normalheight.dds");
+		"dirt_grayrocky_normalheight.dds");*/
+
+	importData.layerList[1].textureNames.push_back(
+		"tiaga_seamless_0_diffusespecular.png");
+	importData.layerList[1].textureNames.push_back(
+		"tiaga_seamless_0_normalheight.png");
+
 	importData.layerList[2].worldSize = 1000;
+
 	importData.layerList[2].textureNames.push_back(
 		"sand_1_diffusespecular.dds");
 	importData.layerList[2].textureNames.push_back(

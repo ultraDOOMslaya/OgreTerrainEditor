@@ -33,8 +33,12 @@ public:
 
 	virtual void frameRendered(const Ogre::FrameEvent& evt);
 	void alterTerrain(Ogre::Terrain* terrain, Ogre::Vector3 centerPosition, Ogre::Vector2 gridCoordinates);
+	void alterDodad(Ogre::Terrain* terrain, Ogre::Vector3 centerPosition, Ogre::Vector2 gridCoordinates);
 	bool mouseReleased(const OgreBites::MouseButtonEvent& evt);
+	bool keyPressed(const OgreBites::KeyboardEvent& evt);
 	void buttonHit(OgreBites::Button* btn);
+	void initializeDodads();
+	void SimRunnable::createDodadSG(Ogre::Vector3 position, int id);
 
 	Ogre::Vector2 updateCoords(Ogre::Vector3 centerPosition);
 	void wipeTerrain();
@@ -54,6 +58,7 @@ public:
 	OgreBites::Label* mInfoLabel = nullptr;
 	OgreBites::Slider* mElevationSlider;
 	OgreBites::Slider* mBrushSizeSlider;
+	OgreBites::SelectMenu* mSelectAlterationSM;
 	OgreBites::SelectMenu* mEditTextureSM;
 	OgreBites::TextBox* mCoordsBox;
 	OgreBites::Button* mNewBtn;
@@ -73,6 +78,8 @@ public:
 	float width, height;
 	std::vector<Cell> worldSpaceCells;
 
+	/** Object Ids **/
+	int mLastDodadId;
 };
 
 #endif __SimRunnable_h_
