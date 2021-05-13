@@ -363,7 +363,8 @@ void SimRunnable::setup(void) {
 
 	root->addFrameListener(this);
 
-	mScnMgr->setAmbientLight(Ogre::ColourValue(0.75f, 0.75f, 0.75f));
+	mScnMgr->setAmbientLight(Ogre::ColourValue(0.85f, 0.85f, 0.85f));
+	//mScnMgr->setAmbientLight(Ogre::ColourValue(0.5f, 0.5f, 0.5f));
 	//mScnMgr->setShadowTechnique(Ogre::ShadowTechnique::SHADOWTYPE_STENCIL_MODULATIVE);
 	Ogre::Light* spotLight = mScnMgr->createLight("SpotLight");
 	spotLight->setType(Ogre::Light::LT_DIRECTIONAL);
@@ -547,14 +548,14 @@ void SimRunnable::frameRendered(const Ogre::FrameEvent& evt)
 void SimRunnable::initializeDodads()
 {
 	const float width = 40;
-	const float height = 250;
+	const float height = 300;
 	Ogre::Vector3 vec(width / 2, 0, 0);
 	Ogre::ManualObject obj("GrassObject");
 
 	Ogre::Quaternion quat;
 	quat.FromAngleAxis(Ogre::Degree(60), Ogre::Vector3::UNIT_Y);
 
-	obj.begin("Examples/GrassBlades5", Ogre::RenderOperation::OT_TRIANGLE_LIST);
+	obj.begin("Examples/GrassWave01", Ogre::RenderOperation::OT_TRIANGLE_LIST);
 
 	obj.position(-vec.x, height, -vec.z);
 	obj.textureCoord(0, 0);
@@ -605,11 +606,11 @@ void SimRunnable::createDodadSG(Ogre::Vector3 position, int id) {
 	sg->setOrigin(position);
 
 	Ogre::Vector3 dodadPosition = position;
-	Ogre::Vector3 scale(1, Ogre::Math::RangeRandom(0.9, 1.1), 1);
+	Ogre::Vector3 scale(1, Ogre::Math::RangeRandom(0.9, 1.0), 1);
 	Ogre::Quaternion orientation;
-	/*orientation.FromAngleAxis(
+	orientation.FromAngleAxis(
 		Ogre::Degree(Ogre::Math::RangeRandom(0, 359)),
-		Ogre::Vector3::UNIT_Y);*/
+		Ogre::Vector3::UNIT_Y);
 	orientation.FromAngleAxis(
 		Ogre::Degree(45),
 		Ogre::Vector3::UNIT_Y);
@@ -715,6 +716,7 @@ void SimRunnable::configureTerrainDefaults(Ogre::Light* light)
 
 	importData.layerList[0].textureNames.push_back("grass_seamless_diffusespecular.png");
 	importData.layerList[0].textureNames.push_back("grass_seamless_diffusespecular.png");
+	//importData.layerList[0].textureNames.push_back("grass_seamless_normalheight.png");
 
 	importData.layerList[1].worldSize = 200;
 	/*importData.layerList[1].textureNames.push_back(
