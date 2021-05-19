@@ -19,6 +19,8 @@
 #include <OgreTerrain.h>
 #include <OgreTerrainGroup.h>
 
+#include "GUI.h"
+
 struct Cell {
 	int x;
 	int y;
@@ -34,11 +36,17 @@ public:
 	virtual void frameRendered(const Ogre::FrameEvent& evt);
 	void alterTerrain(Ogre::Terrain* terrain, Ogre::Vector3 centerPosition, Ogre::Vector2 gridCoordinates);
 	void alterDodad(Ogre::Terrain* terrain, Ogre::Vector3 centerPosition, Ogre::Vector2 gridCoordinates);
+	void createTree(Ogre::Vector3 centerPosition);
 	bool mouseReleased(const OgreBites::MouseButtonEvent& evt);
 	bool keyPressed(const OgreBites::KeyboardEvent& evt);
-	void buttonHit(OgreBites::Button* btn);
+	
 	void initializeDodads();
-	void SimRunnable::createDodadSG(Ogre::Vector3 position, int id);
+	void createDodadSG(Ogre::Vector3 position, int id);
+	void initializeGUI();
+
+	void buttonHit(OgreBites::Button* btn);
+	void itemSelected(OgreBites::SelectMenu* menu);
+	void handleWidgets();
 
 	Ogre::Vector2 updateCoords(Ogre::Vector3 centerPosition);
 	void wipeTerrain();
@@ -57,9 +65,7 @@ public:
 	OgreBites::CheckBox* mMoveableCamera;
 	OgreBites::Label* mInfoLabel = nullptr;
 	OgreBites::Slider* mElevationSlider;
-	OgreBites::Slider* mBrushSizeSlider;
-	OgreBites::SelectMenu* mSelectAlterationSM;
-	OgreBites::SelectMenu* mEditTextureSM;
+
 	OgreBites::TextBox* mCoordsBox;
 	OgreBites::Button* mNewBtn;
 	OgreBites::Button* mLoadBtn;
@@ -67,7 +73,7 @@ public:
 
 	OgreBites::TrayManager* mTrayMgr;
 	Ogre::SceneManager* mScnMgr;
-	Ogre::RaySceneQuery* mRayScnQuery;
+	Ogre::RaySceneQuery* mDodadRayScnQuery;
 	
 	Ogre::Camera* mCam;
 	Ogre::RenderWindow* mWindow;
@@ -80,6 +86,10 @@ public:
 
 	/** Object Ids **/
 	int mLastDodadId;
+	int mLastTreeId;
+
+	/** UI Manager **/
+	GUI* mGUI;
 };
 
 #endif __SimRunnable_h_
